@@ -1,0 +1,6 @@
+mtree [dir | --help | --version]
+    Print a tree view of a directory.
+
+    Options:
+      --help     prints this message
+      --version  prints the version message
