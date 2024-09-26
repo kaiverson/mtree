@@ -76,14 +76,26 @@ impl Config {
         // -L followed by a valid usize sets the max length of any sub directory
         // -T followed by a valid usize sets the total length. How many times render::render_line() is called.
         // exactly one string not following a tag is the base directory.
+
+        let mut directories_contained_in_args: usize = 0;
+
         while let Some(arg) = args.next() {
             let result = match &arg[..].starts_with("-") {
-                false => config.set_root_dir(arg),
+                false => {
+                    directories_contained_in_args += 1;
+                    config.set_root_dir(arg)
+                }
                 true => config.parse_tag_and_value(&arg[..], &mut args),
             };
 
             if let Err(error) = result {
                 return Config::new_error(error);
+            }
+
+            if directories_contained_in_args > 1 {
+                return Config::new_error(
+                    "The arguments can only contain up to one base directory.".to_string(),
+                );
             }
         }
 
@@ -98,6 +110,12 @@ impl Config {
         tag: &str,
         args: &mut IntoIter<String>,
     ) -> Result<(), String> {
+        // Check if the tags are valid. Done twice to ensure error heirarchy.
+        match tag {
+            "-D" | "-L" | "-T" => (),
+            _ => return Err(format!("The tag `{tag}` is invalid.")),
+        }
+
         let value = args
             .next()
             .ok_or_else(|| format!("No value after tag `{tag}`."))?;
@@ -123,6 +141,10 @@ impl Config {
     }
 
     pub fn set_root_dir(&mut self, new_root_dir: String) -> Result<(), String> {
+        if let Err(_error) = std::fs::read_dir(&new_root_dir) {
+            return Err(format!("The directory `{new_root_dir}` does not exist."));
+        }
+
         if let Mode::Render {
             ref mut root_dir, ..
         } = self.mode
@@ -243,127 +265,134 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_no_arguments() {
-        let args: Vec<String> = vec!["program".to_string()];
+    fn test_parse_args_no_arguments() {
+        let args: Vec<String> = vec!["mtree".to_string()];
         let config = Config::from(args);
         assert_eq!(config, Config::new());
     }
 
     #[test]
-    fn test_parse_config_help() {
-        let args: Vec<String> = vec!["program".to_string(), "--help".to_string()];
+    fn test_parse_args_help() {
+        let args: Vec<String> = vec!["mtree".to_string(), "--help".to_string()];
         let config = Config::from(args);
         assert!(config.get_message().is_some());
     }
 
     #[test]
-    fn test_parse_config_version() {
-        let args: Vec<String> = vec!["program".to_string(), "--version".to_string()];
+    fn test_parse_args_version() {
+        let args: Vec<String> = vec!["mtree".to_string(), "--version".to_string()];
         let config = Config::from(args);
         assert!(config.get_message().is_some());
     }
 
     #[test]
-    fn test_parse_config_with_base_dir() {
-        let args: Vec<String> = vec!["program".to_string(), "some_dir".to_string()];
+    fn test_parse_args_with_valid_base_dir() {
+        let args: Vec<String> = vec!["mtree".to_string(), "C:/Windows".to_string()];
         let config = Config::from(args);
-        assert_eq!(config.get_root_dir(), Some("some_dir".to_string()));
+        assert_eq!(config.get_root_dir(), Some("C:/Windows".to_string()));
         assert_eq!(config.get_max_depth(), Some(2));
     }
 
     #[test]
-    fn test_parse_config_with_max_depth() {
+    fn test_parse_args_with_invalid_base_dir() {
+        let args: Vec<String> = vec!["mtree".to_string(), "C:/awoooo0ooogaaaa".to_string()];
+        let config = Config::from(args);
+        assert!(config.get_error().is_some());
+    }
+
+    #[test]
+    fn test_parse_args_with_max_depth() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "-D".to_string(),
             "5".to_string(),
-            "some_dir".to_string(),
+            "C:/Windows".to_string(),
         ];
         let config = Config::from(args);
         assert_eq!(config.get_max_depth(), Some(5));
-        assert_eq!(config.get_root_dir(), Some("some_dir".to_string()));
+        assert_eq!(config.get_root_dir(), Some("C:/Windows".to_string()));
     }
 
     #[test]
-    fn test_parse_config_with_dir_len_limit() {
+    fn test_parse_args_with_dir_len_limit() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "-L".to_string(),
             "10".to_string(),
-            "some_dir".to_string(),
+            "C:/Windows".to_string(),
         ];
         let config = Config::from(args);
         assert_eq!(config.get_dir_len_limit(), Some(10));
-        assert_eq!(config.get_root_dir(), Some("some_dir".to_string()));
+        assert_eq!(config.get_root_dir(), Some("C:/Windows".to_string()));
     }
 
     #[test]
-    fn test_parse_config_with_total_len_limit() {
+    fn test_parse_args_with_total_len_limit() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "-T".to_string(),
             "100".to_string(),
-            "some_dir".to_string(),
+            "C:/Windows".to_string(),
         ];
         let config = Config::from(args);
         assert_eq!(config.get_total_len_limit(), Some(100));
-        assert_eq!(config.get_root_dir(), Some("some_dir".to_string()));
+        assert_eq!(config.get_root_dir(), Some("C:/Windows".to_string()));
     }
 
     #[test]
-    fn test_parse_config_with_multiple_flags() {
+    fn test_parse_args_with_multiple_flags() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "-D".to_string(),
             "3".to_string(),
             "-L".to_string(),
             "10".to_string(),
             "-T".to_string(),
             "50".to_string(),
-            "some_dir".to_string(),
+            "C:/Windows".to_string(),
         ];
         let config = Config::from(args);
         assert_eq!(config.get_max_depth(), Some(3));
         assert_eq!(config.get_dir_len_limit(), Some(10));
         assert_eq!(config.get_total_len_limit(), Some(50));
-        assert_eq!(config.get_root_dir(), Some("some_dir".to_string()));
+        assert_eq!(config.get_root_dir(), Some("C:/Windows".to_string()));
     }
 
     #[test]
-    fn test_parse_config_missing_value_for_depth() {
-        let args: Vec<String> = vec!["program".to_string(), "-D".to_string()];
+    fn test_parse_args_missing_value_for_depth() {
+        let args: Vec<String> = vec!["mtree".to_string(), "-D".to_string()];
         let config = Config::from(args);
         assert!(config.get_error().is_some());
     }
 
     #[test]
-    fn test_parse_config_invalid_depth_value() {
+    fn test_parse_args_invalid_depth_value() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "-D".to_string(),
             "invalid".to_string(),
-            "some_dir".to_string(),
+            "C:/Windows".to_string(),
         ];
         let config = Config::from(args);
         assert!(config.get_error().is_some());
     }
 
     #[test]
-    fn test_parse_config_invalid_tag() {
+    fn test_parse_args_invalid_tag() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "-X".to_string(),
             "10".to_string(),
-            "some_dir".to_string(),
+            "C:/Windows".to_string(),
         ];
         let config = Config::from(args);
         assert!(config.get_error().is_some());
     }
 
     #[test]
-    fn test_parse_config_multiple_base_directories() {
+    fn test_parse_args_multiple_base_directories() {
         let args: Vec<String> = vec![
-            "program".to_string(),
+            "mtree".to_string(),
             "first_dir".to_string(),
             "-D".to_string(),
             "3".to_string(),

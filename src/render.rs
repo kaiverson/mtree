@@ -14,6 +14,11 @@ pub fn render_directory(config: Config) {
             .expect("Config should be in render mode."),
     );
 
+    println!(
+        "{}",
+        path.to_str().expect("Config should be in render mode.")
+    );
+
     // The state table is necessary to prevent branches to nowhere.
     // If a branch is over in a previous layer, we don't need to draw that branch.
     let mut state_table = vec![true; max_depth];

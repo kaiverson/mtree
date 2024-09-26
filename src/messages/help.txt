@@ -1,6 +1,14 @@
-mtree [dir | --help | --version]
-    Print a tree view of a directory.
+Usage: mtree.exe [options] base_directory...
 
-    Options:
-      --help     prints this message
-      --version  prints the version message
+mtree (mini tree) neatly displays a directory.
+
+Options:
+  --help                 Display this information.
+  --version              Display mtree version information.
+  -D <value>             Set the depth of the tree view
+  -L <value>             Set the maximum amount of files and subdirectories
+                         to be visualized in any directory
+  -T <value>             Set the total amount of files and directories to 
+                         be visualized in the tree 
+
+If you experience a bug, that's too damn bad!

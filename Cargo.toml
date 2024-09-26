@@ -2,6 +2,7 @@
 name = "mtree"
 version = "0.1.0"
 edition = "2021"
+authors = ["Kai Iverson"]
 
 [dependencies]
 chrono = "0.4"
