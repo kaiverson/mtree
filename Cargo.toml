@@ -5,4 +5,7 @@ edition = "2021"
 authors = ["Kai Iverson"]
 
 [dependencies]
-chrono = "0.4"
+chrono = "0.4.38"
+
+[build-dependencies]
+chrono = "0.4.38"

@@ -11,4 +11,4 @@ Options:
   -T <value>             Set the total amount of files and directories to 
                          be visualized in the tree 
 
-If you experience a bug, that's too damn bad!
+Report bugs to <https://github.com/kaiverson/mtree/issues>

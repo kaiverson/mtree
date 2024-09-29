@@ -1,6 +1,7 @@
 mod config;
 mod render;
 mod run;
+mod utils;
 
 use config::Config;
 use run::run;

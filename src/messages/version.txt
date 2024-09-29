@@ -1,6 +1,8 @@
-mtree (mini tree) <version>
-compiled on <build_time>
+mtree (mini tree) 0.1.0
+compiled on 1727646932
+
 This is free software: you are free to change and redistribute it.
 This is NO WARRANTY, to the extent permitted by law.
 
-Written by Kai A Iverson from Alaska, USA. see <https://github.com/kaiverson> for more awesome projects.
+Written by Kai A Iverson from Alaska, USA. 
+See <https://github.com/kaiverson> for more awesome projects. 

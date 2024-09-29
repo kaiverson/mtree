@@ -1,4 +1,5 @@
 use super::config::Config;
+use super::render::Renderer;
 
 #[allow(unreachable_code)]
 pub fn run(config: Config) {
@@ -7,6 +8,6 @@ pub fn run(config: Config) {
     } else if let Some(error) = config.get_error() {
         println!("Error: {error}");
     } else {
-        super::render::render_directory(config);
+        Renderer::render_directory(config);
     }
 }

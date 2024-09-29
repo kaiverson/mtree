@@ -1,80 +1,196 @@
 // basic idea: depth first search the files in root_dir
 use super::config::Config;
+use super::utils::Limit;
 use std::fs;
 use std::path::PathBuf;
+use std::time;
 
-pub fn render_directory(config: Config) {
-    let max_depth = config
-        .get_max_depth()
-        .expect("Config should be in render mode.");
-
-    let mut path: PathBuf = PathBuf::from(
-        config
-            .get_root_dir()
-            .expect("Config should be in render mode."),
-    );
-
-    println!(
-        "{}",
-        path.to_str().expect("Config should be in render mode.")
-    );
-
-    // The state table is necessary to prevent branches to nowhere.
-    // If a branch is over in a previous layer, we don't need to draw that branch.
-    let mut state_table = vec![true; max_depth];
-
-    search_directory(&mut path, 0, max_depth, &mut state_table);
+pub struct Renderer {
+    draw_layer_table: Vec<bool>,
+    dir_depth_limit: Limit,
+    dir_len_limit: Limit,
+    total_len_limit: Limit,
+    start_time: time::Instant,
 }
 
-#[allow(clippy::needless_borrows_for_generic_args)]
-fn search_directory(path: &mut PathBuf, depth: usize, max_depth: usize, state_table: &mut [bool]) {
-    let entries = fs::read_dir(&path)
-        .expect("Path should valid and for a dir!")
-        .collect::<Result<Vec<_>, std::io::Error>>()
-        .unwrap();
+impl Renderer {
+    fn new(
+        draw_layer_table: Vec<bool>,
+        dir_depth_limit: Limit,
+        dir_len_limit: Limit,
+        total_len_limit: Limit,
+    ) -> Self {
+        Self {
+            draw_layer_table,
+            dir_depth_limit,
+            dir_len_limit,
+            total_len_limit,
+            start_time: time::Instant::now(),
+        }
+    }
 
-    let last_entry_index = entries.len() - 1;
+    pub fn render_directory(config: Config) {
+        let mut path: PathBuf = PathBuf::from(
+            config
+                .get_root_dir()
+                .expect("Config should be in render mode."),
+        );
 
-    for (index, entry) in entries.iter().enumerate() {
-        let file_type = entry.file_type().unwrap();
-        let file_name = &entry.file_name().into_string().unwrap()[..];
-        let is_last_in_dir = last_entry_index == index;
-        // state_table[depth] = is_last_in_dir;
+        // Create three limits to easily track the bounds of the tree.
+        let dir_depth_limit: Limit = Limit::new(config.get_max_depth());
+        let dir_len_limit: Limit = Limit::new(config.get_dir_len_limit());
+        let total_len_limit: Limit = Limit::new(config.get_total_len_limit());
+
+        // Remembers the past to determine if we should draw:
+        // │   ├── file_name
+        // or
+        //     ├── file_name
+        let draw_layer_table = vec![true; dir_depth_limit.get_limit().unwrap()];
+
+        let mut renderer = Renderer::new(
+            draw_layer_table,
+            dir_depth_limit,
+            dir_len_limit,
+            total_len_limit,
+        );
+
+        // Print the root of the tree.
+        println!(
+            "{}",
+            path.to_str().expect("Config should be in render mode.")
+        );
+
+        let rendered_full_dir = renderer.scan_directory(&mut path);
+
+        if !rendered_full_dir {
+            renderer.render_limit_reached();
+        }
+
+        println!(
+            "\n{} files and directories displayed in {:.2} seconds",
+            renderer.total_len_limit.get_count(),
+            renderer.render_time(),
+        )
+    }
+
+    #[allow(clippy::needless_borrows_for_generic_args)]
+    fn scan_directory(&mut self, path: &mut PathBuf) -> bool {
+        // Get a list of files and sub directoris at the directory at path.
+        let entries = match fs::read_dir(&path) {
+            Ok(read_dir) => read_dir
+                .collect::<Result<Vec<_>, std::io::Error>>()
+                .unwrap(),
+            Err(_) => {
+                let r = self.render_line("[[RESTRICTED]]", true, false);
+                return r;
+            }
+        };
+
+        let entries_len = entries.len();
+
+        if entries_len == 0 {
+            return true;
+        }
+
+        let last_entry_index = entries_len - 1;
+
+        for (index, entry) in entries.iter().enumerate() {
+            let file_type = entry.file_type().unwrap();
+            let file_name = &entry.file_name().into_string().unwrap()[..];
+            let is_last_in_dir = last_entry_index == index;
+
+            self.draw_layer_table[self.dir_depth_limit.get_count()] = !is_last_in_dir;
+            // if is_last_in_dir {
+            // self.draw_layer_table[self.dir_depth_limit.get_count()] = false;
+            // Logically this shouldn't work, but it seems to work perfectly!
+            // }
+
+            let is_dir = file_type.is_dir();
+
+            let continue_render = self.render_line(file_name, is_last_in_dir, is_dir);
+            if !continue_render {
+                return false;
+            }
+
+            if !is_dir {
+                continue;
+            }
+
+            self.dir_depth_limit.increment();
+            if self.dir_depth_limit.is_under_limit() {
+                path.push(file_name);
+                self.scan_directory(path);
+                path.pop();
+            }
+            self.dir_depth_limit.decrement();
+        }
+        self.dir_len_limit.reset_count();
+
+        true
+    }
+
+    fn render_line(&mut self, file_name: &str, is_last_in_dir: bool, is_dir: bool) -> bool {
+        if !self.total_len_limit.is_under_limit() {
+            return false;
+        }
+
+        self.total_len_limit.increment();
+
+        assert!(
+            self.dir_depth_limit
+                .get_limit()
+                .expect("Tree should have a depth limit.")
+                <= self.draw_layer_table.len()
+        );
+
+        let mut print_buffer: String = String::new();
+
+        for &render_layer in self
+            .draw_layer_table
+            .iter()
+            .take(self.dir_depth_limit.get_count())
+        {
+            if render_layer {
+                print_buffer.push_str("│   ");
+            } else {
+                print_buffer.push_str("    ");
+            }
+        }
+
         if is_last_in_dir {
-            state_table[depth] = false; // Logically this shouldn't work, but it seems to work perfectly!
-        }
-
-        render_line(file_name, depth, state_table, is_last_in_dir);
-
-        let is_dir = file_type.is_dir();
-        if is_dir && depth + 1 < max_depth {
-            path.push(file_name);
-            search_directory(path, depth + 1, max_depth, state_table);
-            path.pop();
-        }
-    }
-}
-
-fn render_line(file_name: &str, depth: usize, state_table: &[bool], is_last_in_dir: bool) {
-    assert!(depth <= state_table.len());
-
-    let mut print_buffer: String = String::new();
-
-    for &render_layer in state_table.iter().take(depth) {
-        if render_layer {
-            print_buffer.push_str("│   ");
+            print_buffer.push_str("└── ");
         } else {
-            print_buffer.push_str("    ");
+            print_buffer.push_str("├── ");
+        }
+
+        print_buffer.push_str(file_name);
+
+        if is_dir && self.dir_depth_limit.is_at_limit() {
+            print_buffer.push_str(" ...");
+        }
+
+        println!("{print_buffer}");
+
+        true
+    }
+
+    pub fn render_limit_reached(&mut self) {
+        self.total_len_limit.decrement();
+
+        for &render_layer in self
+            .draw_layer_table
+            .iter()
+            .take(self.total_len_limit.get_count())
+        {
+            if render_layer {
+                print!("... ");
+            } else {
+                print!("    ");
+            }
         }
     }
 
-    if is_last_in_dir {
-        print_buffer.push_str("└── ");
-    } else {
-        print_buffer.push_str("├── ");
+    pub fn render_time(&self) -> f32 {
+        self.start_time.elapsed().as_secs_f32()
     }
-
-    print_buffer.push_str(file_name);
-
-    println!("{print_buffer}");
 }

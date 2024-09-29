@@ -245,18 +245,12 @@ impl Config {
 
     fn get_help_message() -> String {
         std::fs::read_to_string("src/messages/help.txt")
-            .unwrap_or_else(|_| "Error help version message.".to_string())
+            .unwrap_or_else(|_| "Error displaying help message.".to_string())
     }
 
     fn get_version_message() -> String {
-        let version = &std::env::var("CARGO_PKG_VERSION").unwrap()[..];
-        let build_time = &chrono::offset::Utc::now().date_naive().to_string()[..];
-        let message = std::fs::read_to_string("src/messages/version.txt")
-            .unwrap_or_else(|_| "Error reading version message.".to_string());
-
-        message
-            .replace("<version>", version)
-            .replace("<build_time>", build_time)
+        std::fs::read_to_string("src/messages/version.txt")
+            .unwrap_or_else(|_| "Error displaying version message.".to_string())
     }
 }
 
