@@ -66,11 +66,9 @@ impl Renderer {
             renderer.render_limit_reached();
         }
 
-        println!(
-            "\n{} files and directories displayed in {:.2} seconds",
-            renderer.total_len_limit.get_count(),
-            renderer.render_time(),
-        )
+        println!();
+
+        println!("{}", renderer.get_statistics_message());
     }
 
     #[allow(clippy::needless_borrows_for_generic_args)]
@@ -175,8 +173,6 @@ impl Renderer {
     }
 
     pub fn render_limit_reached(&mut self) {
-        self.total_len_limit.decrement();
-
         for &render_layer in self
             .draw_layer_table
             .iter()
@@ -190,7 +186,12 @@ impl Renderer {
         }
     }
 
-    pub fn render_time(&self) -> f32 {
-        self.start_time.elapsed().as_secs_f32()
+    pub fn get_statistics_message(&self) -> String {
+        let elapsed_time = self.start_time.elapsed().as_secs_f32();
+        let amount_of_files_rendered = self.total_len_limit.get_count();
+        format!(
+            "{} files and directories displayed in {:.2} seconds",
+            amount_of_files_rendered, elapsed_time
+        )
     }
 }
