@@ -9,6 +9,10 @@ Options:
   -L <value>             Set the maximum amount of files and subdirectories
                          to be visualized in any directory
   -T <value>             Set the total amount of files and directories to 
-                         be visualized in the tree 
+                         be visualized in the tree
+  -v                     Verbose mode flag
+
+Example usage:
+mtree C:/Windows -T 30 -D 3 -L 10 -v
 
 Report bugs to <https://github.com/kaiverson/mtree/issues>

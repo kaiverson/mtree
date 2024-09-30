@@ -66,9 +66,9 @@ impl Renderer {
             renderer.render_limit_reached();
         }
 
-        println!();
-
-        println!("{}", renderer.get_statistics_message());
+        if config.get_is_verbose() {
+            println!("\n{}", renderer.get_statistics_message());
+        }
     }
 
     #[allow(clippy::needless_borrows_for_generic_args)]

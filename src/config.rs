@@ -3,6 +3,7 @@ use std::vec::IntoIter;
 #[derive(Debug, PartialEq)]
 pub struct Config {
     mode: Mode,
+    is_verbose: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,18 +27,21 @@ impl Config {
                 dir_len_limit: None,
                 total_len_limit: None,
             },
+            is_verbose: false,
         }
     }
 
     pub fn new_message(message: String) -> Self {
         Self {
             mode: Mode::Message(message),
+            is_verbose: false,
         }
     }
 
     pub fn new_error(error: String) -> Self {
         Self {
             mode: Mode::Error(error),
+            is_verbose: false,
         }
     }
 
@@ -112,8 +116,13 @@ impl Config {
     ) -> Result<(), String> {
         // Check if the tags are valid. Done twice to ensure error heirarchy.
         match tag {
-            "-D" | "-L" | "-T" => (),
+            "-D" | "-L" | "-T" | "-v" => (),
             _ => return Err(format!("The tag `{tag}` is invalid.")),
+        }
+
+        if tag == "-v" {
+            self.set_is_verbose(true);
+            return Ok(());
         }
 
         let value = args
@@ -140,7 +149,7 @@ impl Config {
         }
     }
 
-    pub fn set_root_dir(&mut self, new_root_dir: String) -> Result<(), String> {
+    fn set_root_dir(&mut self, new_root_dir: String) -> Result<(), String> {
         if let Err(_error) = std::fs::read_dir(&new_root_dir) {
             return Err(format!("The directory `{new_root_dir}` does not exist."));
         }
@@ -167,7 +176,7 @@ impl Config {
         }
     }
 
-    pub fn set_max_depth(&mut self, new_depth: usize) -> Result<(), String> {
+    fn set_max_depth(&mut self, new_depth: usize) -> Result<(), String> {
         if let Mode::Render {
             ref mut max_depth, ..
         } = self.mode
@@ -187,7 +196,7 @@ impl Config {
         }
     }
 
-    pub fn set_dir_len_limit(&mut self, new_dir_len_limit: Option<usize>) -> Result<(), String> {
+    fn set_dir_len_limit(&mut self, new_dir_len_limit: Option<usize>) -> Result<(), String> {
         if let Mode::Render {
             ref mut dir_len_limit,
             ..
@@ -211,10 +220,7 @@ impl Config {
         }
     }
 
-    pub fn set_total_len_limit(
-        &mut self,
-        new_total_len_limit: Option<usize>,
-    ) -> Result<(), String> {
+    fn set_total_len_limit(&mut self, new_total_len_limit: Option<usize>) -> Result<(), String> {
         if let Mode::Render {
             ref mut total_len_limit,
             ..
@@ -251,6 +257,14 @@ impl Config {
     fn get_version_message() -> String {
         std::fs::read_to_string("src/messages/version.txt")
             .unwrap_or_else(|_| "Error displaying version message.".to_string())
+    }
+
+    pub fn get_is_verbose(&self) -> bool {
+        self.is_verbose
+    }
+
+    fn set_is_verbose(&mut self, is_verbose: bool) {
+        self.is_verbose = is_verbose;
     }
 }
 
@@ -394,5 +408,12 @@ mod tests {
         ];
         let config = Config::from(args);
         assert!(config.get_error().is_some());
+    }
+
+    #[test]
+    fn test_parse_args_is_verbose() {
+        let args: Vec<String> = vec!["mtree".to_string(), "-v".to_string()];
+        let config = Config::from(args);
+        assert!(config.get_is_verbose());
     }
 }
